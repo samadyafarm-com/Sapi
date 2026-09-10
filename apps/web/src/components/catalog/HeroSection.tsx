@@ -1,10 +1,13 @@
 'use client'
 
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
+import { QRCodeSVG } from 'qrcode.react'
 import { BadgeCheck, Clock3, ClipboardList, Shield, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
 import { CattleWithRelations } from '@samadya/shared/types'
-import { getDirectImageUrl } from '@samadya/shared/lib/utils/imageUrl'
+import { getDirectImageUrl, isVideoUrl } from '@samadya/shared/lib/utils/imageUrl'
+import { SITE_URL } from '@/lib/site-url'
 
 interface HeroSectionProps {
   cattle: CattleWithRelations[]
@@ -77,7 +80,6 @@ const trustFeatures = [
 
 export function HeroSection({ cattle, selectedCattle, onSelectCattle, isLoading }: HeroSectionProps) {
   const heroRef = useRef<HTMLElement>(null)
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const [currentIndex, setCurrentIndex] = useState(0)
   const isSliderChange = useRef(false)
 
@@ -92,12 +94,16 @@ export function HeroSection({ cattle, selectedCattle, onSelectCattle, isLoading 
     { value: 100, suffix: '%', label: 'Transparan %' },
   ]
 
-  // Get available cattle with images
-  const displayCattle = cattle.filter(c => c.mainImage)
+  // Get available cattle with photos (a video can't be the hero image)
+  const displayCattle = useMemo(
+    () => cattle.filter(c => c.mainImage && !isVideoUrl(c.mainImage)),
+    [cattle]
+  )
   const currentCattle = displayCattle[currentIndex] || selectedCattle
+  const heroImage = currentCattle?.mainImage && !isVideoUrl(currentCattle.mainImage) ? currentCattle.mainImage : null
 
   // Determine if we should show loading state
-  const showLoading = isLoading || displayCattle.length === 0
+  const showLoading = !!isLoading
 
   // Sync currentIndex when selectedCattle changes from outside (e.g., catalog card click)
   useEffect(() => {
@@ -151,24 +157,29 @@ export function HeroSection({ cattle, selectedCattle, onSelectCattle, isLoading 
     return () => observer.disconnect()
   }, [])
 
+  // Not a .reveal (fade-in) element: the hero is above the fold and
+  // pre-rendered, so it should paint right away instead of waiting for JS
   return (
-    <section ref={heroRef} className="reveal mx-auto grid max-w-full grid-cols-1 items-stretch md:grid-cols-[3.3fr_2.1fr_.9fr] overflow-visible">
+    <section ref={heroRef} className="mx-auto grid max-w-full grid-cols-1 items-stretch md:grid-cols-[3.3fr_2.1fr_.9fr] overflow-visible">
       {/* Image Slider - Mobile uses aspect ratio, desktop uses height */}
       <div className="hero-photo relative w-full md:min-h-[280px] lg:min-h-[350px] xl:min-h-[450px] 2xl:min-h-[520px] overflow-hidden">
         {/* Mobile: Aspect ratio container */}
         <div className="relative w-full aspect-[16/10] md:aspect-auto md:absolute md:inset-0">
-          {/* Image */}
+          {/* Image - next/image (resized for the screen, preloaded with the
+              HTML) rather than a CSS background of the full-size original */}
           {showLoading ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-[hsl(var(--cream))]">
               <Loader2 className="h-6 w-6 xs:h-8 xs:w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 animate-spin text-[hsl(var(--forest))] mb-1 sm:mb-2 md:mb-3" />
               <p className="text-[8px] xs:text-[9px] sm:text-xs font-semibold text-[hsl(var(--forest))]">Memuat...</p>
             </div>
-          ) : currentCattle?.mainImage ? (
-            <div
-              className="absolute inset-0 transition-opacity duration-500"
-              style={{
-                background: `url('${getDirectImageUrl(currentCattle.mainImage)}') center/cover no-repeat`,
-              }}
+          ) : heroImage ? (
+            <Image
+              src={getDirectImageUrl(heroImage)}
+              alt={currentCattle?.name || 'Foto sapi'}
+              fill
+              priority
+              sizes="(min-width: 768px) 55vw, 100vw"
+              className="object-cover"
             />
           ) : (
             <div
@@ -321,7 +332,7 @@ export function HeroSection({ cattle, selectedCattle, onSelectCattle, isLoading 
                 {currentCattle?.gender === 'FEMALE' ? 'BETINA' : 'JANTAN'}
               </div>
 
-              {/* QR Code */}
+              {/* QR Code - generated right in the page, no request to an external QR service */}
               <div className="mx-auto mt-0.5 xs:mt-1 sm:mt-1.5 aspect-square h-[40px] xs:h-[50px] sm:h-[60px] md:h-[70px] lg:h-[80px] w-[40px] xs:w-[50px] sm:w-[60px] md:w-[70px] lg:w-[80px] shrink-0 rounded-[3px] xs:rounded-[4px] sm:rounded-[5px] md:rounded-[6px] border border-[#D4C9B0] bg-white p-0.5 xs:p-1 sm:p-1.5 shadow-sm">
                 {showLoading ? (
                   <div className="flex h-full flex-col items-center justify-center text-center">
@@ -330,10 +341,11 @@ export function HeroSection({ cattle, selectedCattle, onSelectCattle, isLoading 
                   </div>
                 ) : currentCattle ? (
                   <div className="flex h-full items-center justify-center">
-                    <img
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`${baseUrl}/sapi/${currentCattle.code}`)}`}
-                      alt="QR Code"
-                      className="h-full w-full object-contain"
+                    <QRCodeSVG
+                      value={`${SITE_URL}/sapi/${currentCattle.code}`}
+                      size={80}
+                      level="M"
+                      className="h-full w-full"
                     />
                   </div>
                 ) : (

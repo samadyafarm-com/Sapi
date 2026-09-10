@@ -1,35 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/db/prisma'
 import { calculateWeightStats, estimateTargetCompletion } from '@/lib/utils/calculations'
+import { getPublicCattleDetail } from '@/lib/cattle/public-cattle'
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { code: string } }
 ) {
   try {
-    const cattle = await prisma.cattle.findUnique({
-      where: { code: params.code },
-      include: {
-        weights: {
-          orderBy: { measurementDate: 'asc' },
-          include: {
-            media: true,
-          },
-        },
-        healthRecords: {
-          orderBy: { recordDate: 'desc' },
-          include: {
-            media: true,
-          },
-        },
-        feedRecords: {
-          orderBy: { recordDate: 'desc' },
-        },
-        media: {
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-    })
+    // This is an unauthenticated public route - getPublicCattleDetail never
+    // includes internal cost/margin fields.
+    const cattle = await getPublicCattleDetail({ code: params.code })
 
     if (!cattle) {
       return NextResponse.json(
@@ -61,12 +41,8 @@ export async function GET(
       ? cattle.weights[cattle.weights.length - 1].weight
       : null
 
-    // This is an unauthenticated public route - never include internal
-    // cost/margin fields in the response.
-    const { buyPrice, sellPrice, healthCost, feedCost, ...publicCattle } = cattle
-
     return NextResponse.json({
-      ...publicCattle,
+      ...cattle,
       lastWeight,
       weightStats,
       targetEstimation,

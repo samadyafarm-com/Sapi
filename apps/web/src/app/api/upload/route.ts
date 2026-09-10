@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import imageCompression from 'browser-image-compression'
 import { uploadToGoogleDrive, validateGoogleDriveConfig } from '@/lib/storage/google-drive-oauth'
 import { getCurrentAdmin } from '@/lib/auth/jwt'
 
@@ -13,15 +12,6 @@ const FOLDER_MAPPING: Record<string, 'image' | 'video'> = {
   'image': 'image',
   'video': 'video',
   'video-upload': 'video',
-}
-
-// Compression options for images
-const IMAGE_COMPRESSION_OPTIONS = {
-  maxSizeMB: 1, // Max 1MB per image
-  maxWidthOrHeight: 1920, // Max dimension 1920px
-  useWebWorker: true, // Use web worker for compression
-  fileType: 'image/jpeg' as const, // Convert to JPEG for smaller size
-  initialQuality: 0.8, // Start with 80% quality
 }
 
 export async function POST(request: NextRequest) {
@@ -93,9 +83,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate file size before compression
-    const maxSizeBefore = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024 // 100MB video, 10MB image before compression
-    if (file.size > maxSizeBefore) {
+    // Validate file size
+    const maxSize = isVideo ? 100 * 1024 * 1024 : 10 * 1024 * 1024 // 100MB video, 10MB image
+    if (file.size > maxSize) {
       return NextResponse.json(
         { error: `Ukuran file terlalu besar. Maksimal ${isVideo ? '100MB' : '10MB'}.` },
         { status: 400 }
@@ -113,40 +103,13 @@ export async function POST(request: NextRequest) {
       driveFolder,
     })
 
-    // Convert file to buffer (with compression for images)
-    let buffer: Buffer
-    let finalFileType = file.type
-    let finalFileName = file.name
-
-    if (isImage) {
-      try {
-        console.log('[Upload API] Compressing image...')
-
-        // Compress the image
-        const compressedFile = await imageCompression(file, IMAGE_COMPRESSION_OPTIONS)
-
-        console.log('[Upload API] Compression result:', {
-          originalSize: file.size,
-          compressedSize: compressedFile.size,
-          reduction: `${Math.round((1 - compressedFile.size / file.size) * 100)}%`,
-        })
-
-        // Update filename to .jpg if converted
-        finalFileName = compressedFile.name.replace(/\.[^.]+$/, '.jpg')
-        finalFileType = 'image/jpeg'
-        buffer = Buffer.from(await compressedFile.arrayBuffer())
-      } catch (compressionError: any) {
-        console.warn('[Upload API] Compression failed, using original:', compressionError.message)
-        // Fallback to original file if compression fails
-        buffer = Buffer.from(await file.arrayBuffer())
-      }
-    } else {
-      // Video or other files - no compression
-      buffer = Buffer.from(await file.arrayBuffer())
-    }
+    // Photos are compressed in the browser before they're sent (the admin
+    // uploader components) - the compression library needs canvas APIs that
+    // don't exist in this Node runtime, so it can't run here
+    const buffer = Buffer.from(await file.arrayBuffer())
 
     // Upload to Google Drive
-    const result = await uploadToGoogleDrive(buffer, finalFileName, finalFileType, driveFolder)
+    const result = await uploadToGoogleDrive(buffer, file.name, file.type, driveFolder)
 
     console.log('[Upload API] Success:', result)
 
@@ -154,7 +117,7 @@ export async function POST(request: NextRequest) {
     // For images, use direct Google Drive URL
     let publicUrl: string
     if (isVideo) {
-      publicUrl = `/api/stream?fileId=${result.fileId}&mimeType=${encodeURIComponent(finalFileType)}`
+      publicUrl = `/api/stream?fileId=${result.fileId}&mimeType=${encodeURIComponent(file.type)}`
     } else {
       publicUrl = result.directUrl || `https://drive.google.com/uc?export=view&id=${result.fileId}`
     }
@@ -165,7 +128,7 @@ export async function POST(request: NextRequest) {
       fileId: result.fileId,
       webViewLink: result.webViewLink,
       thumbnailUrl: result.thumbnailLink,
-      mimeType: finalFileType,
+      mimeType: file.type,
       ...(result.isPublic ? {} : { warning: 'File berhasil diupload tetapi gagal dibuat publik, URL mungkin tidak bisa diakses.' }),
     })
   } catch (error: any) {

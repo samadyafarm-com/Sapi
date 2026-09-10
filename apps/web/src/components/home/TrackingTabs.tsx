@@ -6,11 +6,13 @@ import { CattleWithRelations } from '@samadya/shared/types'
 import { formatWeight, formatDate } from '@samadya/shared/lib/utils/formatters'
 import { calculateWeightStats } from '@samadya/shared/lib/utils/calculations'
 import { WeightChart } from './WeightChart'
-import { Sprout, Wheat, Pill, Droplets } from 'lucide-react'
+import { Sprout, Wheat, Pill, Droplets, Loader2 } from 'lucide-react'
 import { MediaTab } from '../cattle/MediaTab'
 
 interface TrackingTabsProps {
   cattle: CattleWithRelations | null
+  /** The selected cattle's full history is still being fetched */
+  isLoadingHistory?: boolean
 }
 
 type TabKey = 'ringkasan' | 'timbang' | 'kesehatan' | 'pakan' | 'dokumentasi'
@@ -23,8 +25,11 @@ const tabs: { key: TabKey; label: string }[] = [
   { key: 'dokumentasi', label: 'Dokumentasi' },
 ]
 
-export function TrackingTabs({ cattle }: TrackingTabsProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>('ringkasan')
+export function TrackingTabs({ cattle, isLoadingHistory = false }: TrackingTabsProps) {
+  const [selectedTab, setSelectedTab] = useState<TabKey>('ringkasan')
+  // Tab panels stay hidden while the history loads, so they never flash
+  // "Belum ada ..." for records that simply haven't arrived yet
+  const activeTab = isLoadingHistory ? null : selectedTab
 
   if (!cattle) {
     return (
@@ -75,9 +80,9 @@ export function TrackingTabs({ cattle }: TrackingTabsProps) {
         {tabs.map((tab) => (
           <button
             key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
+            onClick={() => setSelectedTab(tab.key)}
             className={`whitespace-nowrap rounded-md px-3.5 py-2 font-semibold transition-all ${
-              activeTab === tab.key
+              selectedTab === tab.key
                 ? 'bg-[hsl(var(--forest))] text-white shadow-sm'
                 : 'text-[hsl(var(--forest))/75] hover:bg-[hsl(var(--cream))]'
             }`}
@@ -89,6 +94,13 @@ export function TrackingTabs({ cattle }: TrackingTabsProps) {
 
       {/* Tab Content Container */}
       <div className="w-full">
+        {isLoadingHistory && (
+          <div className="flex h-48 items-center justify-center gap-2 text-xs text-[hsl(var(--forest))/60]">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Memuat riwayat perkembangan...
+          </div>
+        )}
+
         {/* RINGKASAN TAB */}
         {activeTab === 'ringkasan' && (
           <div className="grid gap-4 lg:grid-cols-12">

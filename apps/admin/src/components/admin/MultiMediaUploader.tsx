@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import { Upload, Loader2 } from 'lucide-react'
+import { compressImageForUpload } from '@/lib/utils/compressImage'
 
 interface MultiMediaUploaderProps {
   cattleId: string
@@ -109,7 +110,7 @@ export function MultiMediaUploader({ cattleId, onUploaded }: MultiMediaUploaderP
           const url =
             isVideo && file.size > CHUNK_SIZE
               ? await uploadChunked(file, setProgressText)
-              : await uploadDirect(file)
+              : await uploadDirect(await compressImageForUpload(file))
 
           const saveRes = await fetch('/api/admin/media', {
             method: 'POST',

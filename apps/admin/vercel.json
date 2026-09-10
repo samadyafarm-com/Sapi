@@ -2,6 +2,7 @@
   "framework": "nextjs",
   "buildCommand": "npm run generate --workspace=@samadya/prisma && npm run build --workspace=@samadya/admin",
   "devCommand": "npm run dev --workspace=@samadya/admin",
+  "regions": ["sin1"],
   "headers": [
     {
       "source": "/api/upload",

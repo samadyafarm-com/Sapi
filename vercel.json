@@ -3,7 +3,7 @@
   "buildCommand": "npx prisma generate && npm run build",
   "devCommand": "npm run dev",
   "installCommand": "npm install",
-  "regions": ["sin"],
+  "regions": ["sin1"],
   "env": {
     "DATABASE_URL": "@database_url",
     "JWT_SECRET": "@jwt_secret",

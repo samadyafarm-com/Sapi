@@ -23,9 +23,11 @@ function extractDriveFileId(url: string): string | null {
 
 /**
  * Get direct image URL for display
- * Automatically proxies Google Drive images to bypass CORS
+ * Automatically proxies Google Drive images to bypass CORS. Pass `width` to
+ * get a resized copy from the proxy - for spots that don't go through
+ * next/image (which resizes on its own), like CSS backgrounds.
  */
-export function getDirectImageUrl(path: string | null | undefined): string {
+export function getDirectImageUrl(path: string | null | undefined, width?: number): string {
   if (!path) return '/placeholder-cattle.png'
 
   // If it's already an absolute URL (external), check if it's Google Drive
@@ -33,7 +35,7 @@ export function getDirectImageUrl(path: string | null | undefined): string {
     const driveFileId = extractDriveFileId(path)
     if (driveFileId) {
       // Use image proxy for Google Drive images
-      return `${IMAGE_PROXY_URL}?id=${driveFileId}`
+      return `${IMAGE_PROXY_URL}?id=${driveFileId}${width ? `&w=${width}` : ''}`
     }
     // Return other external URLs as-is
     return path
@@ -46,6 +48,19 @@ export function getDirectImageUrl(path: string | null | undefined): string {
 
   // Otherwise treat as a storage path
   return `${IMAGE_BASE_URL}/${path}`
+}
+
+/**
+ * Poster-frame image for a video stored on Google Drive (Drive generates one
+ * on upload), served through the image proxy. Null for non-Drive videos.
+ */
+export function getVideoThumbnailUrl(path: string | null | undefined, width = 640): string | null {
+  if (!path) return null
+
+  // Our stream URLs carry the Drive ID as ?fileId=..., Drive links as ?id= or /file/d/
+  const streamFileId = path.match(/[?&]fileId=([^&]+)/)?.[1]
+  const fileId = streamFileId || (isGoogleDriveUrl(path) ? extractDriveFileId(path) : null)
+  return fileId ? `${IMAGE_PROXY_URL}?id=${fileId}&w=${width}` : null
 }
 
 /**
