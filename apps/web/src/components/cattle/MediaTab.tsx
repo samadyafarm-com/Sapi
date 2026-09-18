@@ -286,7 +286,7 @@ export function MediaTab({ media }: MediaTabProps) {
                 src={getVideoUrl(currentItem.fileUrl)}
                 controls
                 autoPlay
-                className="max-w-full max-h-[85vh] rounded-lg"
+                className="max-w-full max-h-full rounded-lg object-contain"
               />
             ) : (
               <div className="relative w-full h-full">
