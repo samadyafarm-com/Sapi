@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, X, Loader2, Image as ImageIcon, Play, Pause } from 'lucide-react'
 import { getDirectImageUrl } from '@samadya/shared/lib/utils/imageUrl'
+import { compressImageForUpload } from '@/lib/utils/compressImage'
 
 interface ImageUploaderProps {
   value?: string
@@ -157,9 +158,16 @@ export function ImageUploader({
       if (isVideoFile && file.size > CHUNK_SIZE) {
         url = await uploadChunked(file, uploadFolder)
       } else {
-        // Direct upload for images and small videos
+        // Direct upload for images and small videos. Photos are shrunk
+        // first - phone originals are often several MB
+        let uploadFile = file
+        if (!isVideoFile) {
+          setStatusText('Mengompres foto...')
+          uploadFile = await compressImageForUpload(file)
+        }
+
         const formData = new FormData()
-        formData.append('file', file)
+        formData.append('file', uploadFile)
         formData.append('folder', uploadFolder)
 
         setStatusText('Mengupload...')

@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Status } from '@prisma/client'
 import { prisma } from '@/lib/db/prisma'
 import { getCurrentUser } from '@/lib/auth/jwt'
+import { getPublicCattleList } from '@/lib/cattle/public-cattle'
 
 export const dynamic = 'force-dynamic'
+
+const MAX_LIMIT = 100
+const VALID_STATUSES = new Set<string>(Object.values(Status))
+
+// "AVAILABLE,BOOKED" -> ['AVAILABLE', 'BOOKED']; null if any value isn't a real status
+function parseStatusList(value: string | null): Status[] | null {
+  if (!value) return []
+  const statuses = value.split(',').map((s) => s.trim())
+  return statuses.every((s) => VALID_STATUSES.has(s)) ? (statuses as Status[]) : null
+}
 
 // Auto-generate cattle code as SP-<year><month>-<sequence>, e.g. SP-202602-001
 async function generateCattleCode(): Promise<string> {
@@ -31,46 +43,19 @@ async function generateCattleCode(): Promise<string> {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status')
-    const limitParam = searchParams.get('limit')
-    const limit = limitParam ? parseInt(limitParam, 10) : undefined
+    const status = parseStatusList(searchParams.get('status'))
+    const excludeStatus = parseStatusList(searchParams.get('excludeStatus'))
+    if (!status || !excludeStatus) {
+      return NextResponse.json({ error: 'Invalid status filter' }, { status: 400 })
+    }
 
-    const cattle = await prisma.cattle.findMany({
-      where: status ? { status: status as any } : undefined,
-      orderBy: { createdAt: 'desc' },
-      take: limit,
-      include: {
-        weights: {
-          orderBy: { measurementDate: 'desc' },
-          take: 20,
-        },
-        healthRecords: {
-          orderBy: { recordDate: 'desc' },
-          take: 10,
-        },
-        feedRecords: {
-          orderBy: { recordDate: 'desc' },
-          take: 10,
-        },
-        media: {
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        },
-      },
-    })
+    const limitParam = parseInt(searchParams.get('limit') || '', 10)
+    const limit = Number.isNaN(limitParam) ? MAX_LIMIT : Math.min(Math.max(limitParam, 1), MAX_LIMIT)
 
     // This route is called unauthenticated by the public site (homepage /
-    // katalog transparency features), so internal cost/margin fields must
-    // never be included in the response even though the DB query needs
-    // them for other calculations elsewhere in the app.
-    const items = cattle.map(({ weights, healthRecords, feedRecords, media, buyPrice, sellPrice, healthCost, feedCost, ...c }) => ({
-      ...c,
-      lastWeight: weights[0]?.weight || null,
-      weights,
-      healthRecords,
-      feedRecords,
-      media,
-    }))
+    // katalog), so it serves the same lean, cost-field-free list those
+    // pages pre-render. A cattle's full history comes from /api/cattle/[code].
+    const items = await getPublicCattleList({ status, excludeStatus, limit })
 
     return NextResponse.json({ items, total: items.length })
   } catch (error) {

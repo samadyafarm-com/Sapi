@@ -8,6 +8,8 @@ import { CompareModal } from './CompareModal'
 
 interface PantauPerkembanganSectionProps {
   cattle: CattleWithRelations | null
+  /** Full history of `cattle` is still loading */
+  isLoadingHistory?: boolean
   allCattle?: CattleWithRelations[]
   comparingCattle?: CattleWithRelations[]
   onCompareSelect?: (cattle: CattleWithRelations) => void
@@ -16,6 +18,7 @@ interface PantauPerkembanganSectionProps {
 
 export function PantauPerkembanganSection({
   cattle,
+  isLoadingHistory = false,
   allCattle = [],
   comparingCattle = [],
   onCompareSelect,
@@ -67,7 +70,7 @@ export function PantauPerkembanganSection({
 
           {/* Right Main Content - Tracking Tabs */}
           <div className="p-3 sm:p-5 min-w-0">
-            <TrackingTabs cattle={cattle} />
+            <TrackingTabs cattle={cattle} isLoadingHistory={isLoadingHistory} />
           </div>
 
         </div>

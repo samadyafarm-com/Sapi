@@ -7,6 +7,7 @@ import { CattleStatusBadge } from '@samadya/shared/components/ui/CattleStatusBad
 import { formatWeight, formatDate } from '@samadya/shared/lib/utils/formatters'
 import { getDirectImageUrl, isVideoUrl } from '@samadya/shared/lib/utils/imageUrl'
 import { ScanLine, Columns3, Check, Film } from 'lucide-react'
+import { SITE_URL } from '@/lib/site-url'
 
 interface SelectedCattleDetailProps {
   cattle: CattleWithRelations | null
@@ -36,9 +37,9 @@ export function SelectedCattleDetail({ cattle, onCompare, isComparing = false }:
   const firstWeight = sortedWeights[0]?.weight
   const birthDate = cattle.birthDate ? new Date(cattle.birthDate) : null
 
-  const qrUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/sapi/${cattle.code}`
-    : `/sapi/${cattle.code}`
+  // Same absolute URL on server and client (the page is pre-rendered), so the
+  // QR code hydrates without a mismatch
+  const qrUrl = `${SITE_URL}/sapi/${cattle.code}`
 
   return (
     <div className="h-full w-full flex flex-col justify-between gap-3">
@@ -48,7 +49,7 @@ export function SelectedCattleDetail({ cattle, onCompare, isComparing = false }:
           {/* Photo diperbesar dari kiri ke kanan (Full Width 16:9) */}
           <div className="relative aspect-video w-full overflow-hidden rounded bg-[hsl(var(--cream))] border border-[hsl(var(--line))]">
             {cattle.mainImage && !isVideoUrl(cattle.mainImage) ? (
-              <Image src={getDirectImageUrl(cattle.mainImage)} alt={cattle.name} fill className="object-cover" />
+              <Image src={getDirectImageUrl(cattle.mainImage)} alt={cattle.name} fill className="object-cover" sizes="(min-width: 1024px) 300px, 100vw" />
             ) : cattle.mainImage && isVideoUrl(cattle.mainImage) ? (
               <div className="flex items-center justify-center h-full bg-gradient-to-br from-[hsl(var(--forest))/20] to-[hsl(var(--forest))/40]">
                 <Film className="h-8 w-8 text-[hsl(var(--forest))/50]" />

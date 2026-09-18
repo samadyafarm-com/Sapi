@@ -1,5 +1,6 @@
 {
   "framework": "nextjs",
   "buildCommand": "cd ../../packages/prisma && npx prisma generate && cd ../../apps/web && npm run build",
-  "devCommand": "npm run dev"
+  "devCommand": "npm run dev",
+  "regions": ["sin1"]
 }
